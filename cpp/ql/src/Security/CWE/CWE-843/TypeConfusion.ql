@@ -14,6 +14,7 @@ import cpp
 import semmle.code.cpp.dataflow.new.DataFlow
 import Flow::PathGraph
 
+<<<<<<< HEAD
 /** Holds if `f` is the last field of its declaring class. */
 predicate lastField(Field f) {
   exists(Class c | c = f.getDeclaringType() |
@@ -23,15 +24,35 @@ predicate lastField(Field f) {
       |
         cand order by byteOffset
       )
+=======
+/**
+ * Holds if `f` is a field located at byte offset `offset` in `c`.
+ */
+predicate hasAFieldWithOffset(Class c, Field f, int offset) {
+  f = c.getAField() and
+  offset = f.getByteOffset()
+  or
+  exists(Field g |
+    g = c.getAField() and
+    g =
+      max(Field cand, int candOffset |
+        cand = c.getAField() and
+        candOffset = cand.getByteOffset() and
+        offset >= candOffset
+      |
+        cand order by candOffset
+      ) and
+    hasAFieldWithOffset(g.getUnspecifiedType(), f, offset - g.getByteOffset())
+>>>>>>> f59589245a0 (Refactor: relax QL query logic)
   )
 }
 
 /**
- * Holds if there exists a field in `c2` at offset `offset` that's compatible
- * with `f1`.
+ * Holds if there exists a field in `c2` at offset `offset`.
  */
-bindingset[f1, offset, c2]
+bindingset[offset, c2]
 pragma[inline_late]
+<<<<<<< HEAD
 predicate hasCompatibleFieldAtOffset(Field f1, int offset, Class c2) {
   exists(Field f2 | offset = f2.getOffsetInClass(c2) |
     // Let's not deal with bit-fields for now.
@@ -75,9 +96,17 @@ predicate prefix(Class c1, Class c2) {
 /**
  * An unsafe cast is any explicit cast that is not
  * a `dynamic_cast`.
+=======
+predicate hasCompatibleFieldAtOffset(int offset, Class c2) {
+  exists(Field f2 | hasAFieldWithOffset(c2, f2, offset))
+}
+
+/**
+ * An unsafe cast is any explicit cast.
+>>>>>>> f59589245a0 (Refactor: relax QL query logic)
  */
 class UnsafeCast extends Cast {
-  private Class toType;
+  private Type toType;
 
   UnsafeCast() {
     (
@@ -86,74 +115,43 @@ class UnsafeCast extends Cast {
       this instanceof StaticCast
       or
       this instanceof ReinterpretCast
+      or
+      this instanceof ConstCast
     ) and
-    toType = this.getExplicitlyConverted().getUnspecifiedType().stripType() and
-    not this.isImplicit() and
-    exists(TypeDeclarationEntry tde |
-      tde = toType.getDefinition() and
-      not tde.isFromUninstantiatedTemplate(_)
-    )
+    toType = this.getExplicitlyConverted().getUnspecifiedType().stripType()
   }
 
-  Class getConvertedType() { result = toType }
+  Type getConvertedType() { result = toType }
 
   /**
-   * Holds if the result of this cast can safely be interpreted as a value of
-   * type `t`.
-   *
-   * The compatibility rules are as follows:
-   *
-   * 1. the result of `(T)x` is compatible with the type `T` for any `T`
-   * 2. the result of `(T)x` is compatible with the type `U` for any `U` such
-   *    that `U` is a subtype of `T`, or `T` is a subtype of `U`.
-   * 3. the result of `(T)x` is compatible with the type `U` if the list
-   *    of fields of `T` is a prefix of the list of fields of `U`.
-   *    For example, if `U` is `struct { unsigned char x; int y; };`
-   *    and `T` is `struct { unsigned char uc; };`.
-   * 4. the result of `(T)x` is compatible with the type `U` if the list
-   *    of fields of `U` is a prefix of the list of fields of `T`.
-   *
-   *    Condition 4 is a bit controversial, since it assumes that the additional
-   *    fields in `T` won't be accessed. This may result in some FNs.
+   * Simplified compatibility check - only exact type matches are considered compatible
    */
   bindingset[this, t]
   pragma[inline_late]
   predicate compatibleWith(Type t) {
-    // Conition 1
     t.stripType() = this.getConvertedType()
-    or
-    // Condition 3
-    prefix(this.getConvertedType(), t.stripType())
-    or
-    // Condition 4
-    prefix(t.stripType(), this.getConvertedType())
-    or
-    // Condition 2 (a)
-    t.stripType().(Class).getABaseClass+() = this.getConvertedType()
-    or
-    // Condition 2 (b)
-    t.stripType() = this.getConvertedType().getABaseClass+()
   }
 }
 
 /**
  * Holds if `source` is an allocation that allocates a value of type `type`.
  */
-predicate isSourceImpl(DataFlow::Node source, Class type) {
+predicate isSourceImpl(DataFlow::Node source, Type type) {
   exists(AllocationExpr alloc |
     alloc = source.asExpr() and
-    type = alloc.getAllocatedElementType().stripType() and
-    not exists(
-      alloc
-          .(NewOrNewArrayExpr)
-          .getAllocator()
-          .(OperatorNewAllocationFunction)
-          .getPlacementArgument()
-    )
-  ) and
-  exists(TypeDeclarationEntry tde |
-    tde = type.getDefinition() and
-    not tde.isFromUninstantiatedTemplate(_)
+    type = alloc.getAllocatedElementType().stripType()
+  )
+  or
+  // Also include variable declarations as sources
+  exists(Variable v |
+    source.asExpr() = v.getAnAccess() and
+    type = v.getType().stripType()
+  )
+  or
+  // Include function parameters as sources
+  exists(Parameter p |
+    source.asParameter() = p and
+    type = p.getType().stripType()
   )
 }
 
@@ -161,28 +159,16 @@ predicate isSourceImpl(DataFlow::Node source, Class type) {
 module Config implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node source) { isSourceImpl(source, _) }
 
-  predicate isBarrier(DataFlow::Node node) {
-    // We disable flow through global variables to reduce FPs from infeasible paths
-    node instanceof DataFlow::VariableNode
-    or
-    exists(Class c | c = node.getType().stripType() |
-      not c.hasDefinition()
-      or
-      exists(TypeDeclarationEntry tde |
-        tde = c.getDefinition() and
-        tde.isFromUninstantiatedTemplate(_)
-      )
-    )
-  }
+  predicate isBarrier(DataFlow::Node node) { none() }
 
   predicate isSink(DataFlow::Node sink) { sink.asExpr() = any(UnsafeCast cast).getUnconverted() }
 
-  int fieldFlowBranchLimit() { result = 0 }
+  int fieldFlowBranchLimit() { result = 1000 }
 }
 
 module Flow = DataFlow::Global<Config>;
 
-predicate relevantType(DataFlow::Node sink, Class allocatedType) {
+predicate relevantType(DataFlow::Node sink, Type allocatedType) {
   exists(DataFlow::Node source |
     Flow::flow(source, sink) and
     isSourceImpl(source, allocatedType)
@@ -190,7 +176,7 @@ predicate relevantType(DataFlow::Node sink, Class allocatedType) {
 }
 
 predicate isSinkImpl(
-  DataFlow::Node sink, Class allocatedType, Type convertedType, boolean compatible
+  DataFlow::Node sink, Type allocatedType, Type convertedType, boolean compatible
 ) {
   exists(UnsafeCast cast |
     relevantType(sink, allocatedType) and
@@ -208,14 +194,6 @@ where
   Flow::flowPath(source, sink) and
   sinkNode = sink.getNode() and
   isSourceImpl(source.getNode(), badSourceType) and
-  isSinkImpl(sinkNode, badSourceType, sinkType, false) and
-  // If there is any flow that would result in a valid cast then we don't
-  // report an alert here. This reduces the number of FPs from infeasible paths
-  // significantly.
-  not exists(DataFlow::Node goodSource, Type goodSourceType |
-    isSourceImpl(goodSource, goodSourceType) and
-    isSinkImpl(sinkNode, goodSourceType, sinkType, true) and
-    Flow::flow(goodSource, sinkNode)
-  )
+  isSinkImpl(sinkNode, badSourceType, sinkType, false)
 select sinkNode, source, sink, "Conversion from $@ to $@ is invalid.", badSourceType,
   badSourceType.toString(), sinkType, sinkType.toString()

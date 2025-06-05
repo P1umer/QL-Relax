@@ -5,7 +5,7 @@
  * @kind path-problem
  * @problem.severity error
  * @security-severity 8.1
- * @precision medium
+ * @precision low
  * @id cpp/uncontrolled-allocation-size
  * @tags reliability
  *       security
@@ -26,10 +26,13 @@ import Bounded
  * Holds if `alloc` is an allocation, and `tainted` is a child of it that is a
  * taint sink.
  */
-predicate allocSink(HeuristicAllocationExpr alloc, DataFlow::Node sink) {
+predicate allocSink(Expr alloc, DataFlow::Node sink) {
   exists(Expr e | e = sink.asExpr() |
-    e = alloc.getAChild() and
-    e.getUnspecifiedType() instanceof IntegralType
+    (
+      alloc instanceof AllocationExpr or
+      alloc instanceof FunctionCall
+    ) and
+    e = alloc.getAChild()
   )
 }
 
@@ -38,15 +41,12 @@ predicate readsVariable(LoadInstruction load, Variable var, IRBlock bb) {
   bb = load.getBlock()
 }
 
-predicate hasUpperBoundsCheck(Variable var) {
-  exists(RelationalOperation oper, VariableAccess access |
-    oper.getAnOperand() = access and
-    access.getTarget() = var and
-    // Comparing to 0 is not an upper bound check
-    not oper.getAnOperand().getValue() = "0"
-  )
+predicate isFlowSource(FlowSource source, string sourceType) { 
+  sourceType = source.getSourceType() or
+  sourceType = "expanded-source"
 }
 
+<<<<<<< HEAD
 predicate variableEqualityCheckedInBlock(Variable checkedVar, IRBlock bb) {
   exists(Operand access |
     readsVariable(access.getDef(), checkedVar, _) and
@@ -64,21 +64,19 @@ predicate nodeIsBarrierEquality(DataFlow::Node node) {
 
 predicate isFlowSource(FlowSource source, string sourceType) { sourceType = source.getSourceType() }
 
+=======
+>>>>>>> f59589245a0 (Refactor: relax QL query logic)
 module TaintedAllocationSizeConfig implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node source) { isFlowSource(source, _) }
 
   predicate isSink(DataFlow::Node sink) { allocSink(_, sink) }
 
   predicate isBarrier(DataFlow::Node node) {
+    // Only keep the most basic barriers
     exists(Expr e | e = node.asExpr() |
       bounded(e)
-      or
-      // Subtracting two pointers is either well-defined (and the result will likely be small), or
-      // terribly undefined and dangerous. Here, we assume that the programmer has ensured that the
-      // result is well-defined (i.e., the two pointers point to the same object), and thus the result
-      // will likely be small.
-      e = any(PointerDiffExpr diff).getAnOperand()
     )
+<<<<<<< HEAD
     or
     exists(Variable checkedVar, Instruction instr | instr = node.asOperand().getDef() |
       readsVariable(instr, checkedVar, _) and
@@ -90,10 +88,25 @@ module TaintedAllocationSizeConfig implements DataFlow::ConfigSig {
     // block flow to inside of identified allocation functions (this flow leads
     // to duplicate results)
     any(HeuristicAllocationFunction f).getAParameter() = node.asParameter()
+=======
+>>>>>>> f59589245a0 (Refactor: relax QL query logic)
   }
 }
 
 module TaintedAllocationSize = TaintTracking::Global<TaintedAllocationSizeConfig>;
+
+// from
+//   Expr alloc, TaintedAllocationSize::PathNode source, TaintedAllocationSize::PathNode sink,
+//   string taintCause
+// where
+//   isFlowSource(source.getNode(), taintCause) and
+//   TaintedAllocationSize::flowPath(source, sink) and
+//   allocSink(alloc, sink.getNode())
+//   // and sink.getNode().getFunction().toString().matches("%bad%")
+// // select alloc, source, sink,
+// //   "This allocation size is derived from $@ and could allocate arbitrary amounts of memory.",
+// //   source.getNode(), "user input (" + taintCause + ")"
+// select sink.getNode().getLocation().getFile().getAbsolutePath().toString()
 
 from
   Expr alloc, TaintedAllocationSize::PathNode source, TaintedAllocationSize::PathNode sink,

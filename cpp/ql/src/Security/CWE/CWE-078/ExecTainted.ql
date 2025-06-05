@@ -25,17 +25,12 @@ import ExecTaint::PathGraph
 
 /**
  * Holds if `incoming` is a string that is used in a format or concatenation function resulting
- * in `outgoing`, and is *not* placed at the start of the resulting string. This indicates that
- * the author did not expect `incoming` to control what program is run if the resulting string
- * is eventually interpreted as a command line, for example as an argument to `system`.
+ * in `outgoing`. Removed position and format type restrictions.
  */
 predicate interestingConcatenation(DataFlow::Node incoming, DataFlow::Node outgoing) {
-  exists(FormattingFunctionCall call, int index, FormatLiteral literal |
+  exists(FormattingFunctionCall call, int index |
     incoming.asIndirectArgument() = call.getConversionArgument(index) and
-    outgoing.asDefiningArgument() = call.getOutputArgument(false) and
-    literal = call.getFormat() and
-    not literal.getConvSpecOffset(index) = 0 and
-    literal.getConversionChar(index) = ["s", "S"]
+    outgoing.asDefiningArgument() = call.getOutputArgument(false)
   )
   or
   // strcat and friends
@@ -49,7 +44,14 @@ predicate interestingConcatenation(DataFlow::Node incoming, DataFlow::Node outgo
     call.getTarget() = op and
     op.hasQualifiedName("std", "operator+") and
     op.getType().(UserType).hasQualifiedName("std", "basic_string") and
+<<<<<<< HEAD
     incoming.asIndirectArgument() = call.getArgument(1) and // right operand
+=======
+    (
+      incoming.asIndirectArgument() = call.getArgument(0) or // left operand
+      incoming.asIndirectArgument() = call.getArgument(1)    // right operand
+    ) and
+>>>>>>> f59589245a0 (Refactor: relax QL query logic)
     call = outgoing.asInstruction().getUnconvertedResultExpression()
   )
 }
@@ -94,15 +96,13 @@ predicate isSinkImpl(DataFlow::Node sink, Expr command, string callChain) {
 }
 
 predicate isBarrierImpl(DataFlow::Node node) {
-  node.asExpr().getUnspecifiedType() instanceof IntegralType
-  or
-  node.asExpr().getUnspecifiedType() instanceof FloatingPointType
+  // Removed type-based barriers
+  none()
 }
 
 /**
  * A `TaintTracking` configuration that's used to find the relevant `ExecState`s for a
- * given sink. This avoids a cartesian product between all sinks and all `ExecState`s in
- * `ExecTaintConfiguration::isSink`.
+ * given sink.
  */
 module ExecStateConfig implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node source) { any(ExecState state).getOutgoingNode() = source }
@@ -112,7 +112,8 @@ module ExecStateConfig implements DataFlow::ConfigSig {
   predicate isBarrier(DataFlow::Node node) { isBarrierImpl(node) }
 
   predicate isBarrierOut(DataFlow::Node node) {
-    isSink(node) // Prevent duplicates along a call chain, since `shellCommand` will include wrappers
+    // Removed duplicate prevention barrier
+    none()
   }
 }
 
@@ -134,21 +135,33 @@ module ExecTaintConfig implements DataFlow::StateConfigSig {
 
   predicate isSink(DataFlow::Node sink, FlowState state) {
     ExecStateConfig::isSink(sink) and
-    state.(ExecState).isFeasibleForSink(sink)
+    (
+      state.(ExecState).isFeasibleForSink(sink) or
+      state instanceof ConcatState  // Allow direct flow without requiring concatenation state
+    )
   }
 
   predicate isAdditionalFlowStep(
     DataFlow::Node node1, FlowState state1, DataFlow::Node node2, FlowState state2
   ) {
-    state1 instanceof ConcatState and
-    state2.(ExecState).getIncomingNode() = node1 and
-    state2.(ExecState).getOutgoingNode() = node2
+    (
+      state1 instanceof ConcatState and
+      state2.(ExecState).getIncomingNode() = node1 and
+      state2.(ExecState).getOutgoingNode() = node2
+    ) or
+    (
+      // Allow direct state transitions
+      state1 instanceof ConcatState and
+      state2 instanceof ConcatState and
+      DataFlow::localFlowStep(node1, node2)
+    )
   }
 
   predicate isBarrier(DataFlow::Node node) { isBarrierImpl(node) }
 
   predicate isBarrierOut(DataFlow::Node node) {
-    isSink(node, _) // Prevent duplicates along a call chain, since `shellCommand` will include wrappers
+    // Removed duplicate prevention barrier
+    none()
   }
 }
 
@@ -161,8 +174,11 @@ where
   ExecTaint::flowPath(sourceNode, sinkNode) and
   taintCause = sourceNode.getNode().(FlowSource).getSourceType() and
   isSinkImpl(sinkNode.getNode(), command, callChain) and
-  concatResult = sinkNode.getState().(ExecState).getOutgoingNode()
+  (
+    concatResult = sinkNode.getState().(ExecState).getOutgoingNode() or
+    concatResult = sinkNode.getNode()  // Handle direct cases without concatenation
+  )
 select command, sourceNode, sinkNode,
-  "This argument to an OS command is derived from $@, dangerously concatenated into $@, and then passed to "
+  "This argument to an OS command is derived from $@, potentially concatenated into $@, and then passed to "
     + callChain + ".", sourceNode, "user input (" + taintCause + ")", concatResult,
   concatResult.toString()
