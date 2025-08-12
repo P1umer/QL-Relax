@@ -1,0 +1,39 @@
+# Log files
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Temporary files
+*.tmp
+*.temp 
+
+# Personal/scratch files
+run.sh
+claude-sdk-readme.md
+
+juliet-test-suite-c/*
+qlworkspace/*
+
+juliet-test-suite-c/

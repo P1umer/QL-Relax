@@ -1,0 +1,109 @@
+{
+    "models": {
+        "gpt-4o": {
+            "provider": "openai",
+            "model_name": "gpt-4o",
+            "max_tokens": 8192,
+            "description": "OpenAI GPT-4o model"
+        },
+        "gpt-3.5-turbo": {
+            "provider": "openai",
+            "model_name": "gpt-3.5-turbo",
+            "max_tokens": 4096,
+            "description": "OpenAI GPT-3.5 Turbo model"
+        },
+        "azure-gpt4o": {
+            "provider": "azure",
+            "model_name": "gpt-4o",
+            "deployment_name": "caozong-exp",
+            "api_version": "2024-08-01-preview",
+            "max_tokens": 8192,
+            "description": "Azure OpenAI GPT-4o deployment"
+        },
+        "deepseek-v2.5": {
+            "provider": "siliconflow",
+            "model_name": "deepseek-ai/DeepSeek-V2.5",
+            "max_tokens": 4096,
+            "description": "DeepSeek V2.5 model via SiliconFlow"
+        },
+        "deepseek-v3": {
+            "provider": "siliconflow",
+            "model_name": "Pro/deepseek-ai/DeepSeek-V3",
+            "max_tokens": 4096,
+            "description": "DeepSeek V3 model via SiliconFlow"
+        },
+        "deepseek-r1": {
+            "provider": "siliconflow",
+            "model_name": "Pro/deepseek-ai/DeepSeek-R1",
+            "max_tokens": 8192,
+            "description": "DeepSeek R1 model via SiliconFlow"
+        },
+        "azure-deepseek-r1": {
+            "provider": "azure-deepseek",
+            "model_name": "DeepSeek-R1",
+            "deployment_name": "deepseek-r1",
+            "api_version": "2024-05-01-preview",
+            "max_tokens": 8192,
+            "description": "Azure DeepSeek R1 deployment"
+        },
+        "openrouter-deepseek-r1": {
+            "description": "OpenRouter Model",
+            "provider": "openrouter",
+            "model_name": "deepseek/deepseek-r1",
+            "max_tokens": 163840,
+            "api_version": "v1",
+            "openrouter_provider": {
+                "order": ["Anthropic", "Fireworks"],
+                "allow_fallbacks": true,
+                "sort": "throughput",
+                "ignore": ["Meta"],
+                "require_parameters": false
+            }
+        },
+        "qwq-32b": {
+            "provider": "openrouter",
+            "model_name": "qwen/qwq-32b",
+            "max_tokens": 100000,
+            "description": "QwQ 32B model",
+            "api_version": "v1",
+            "openrouter_provider": {
+                "order": ["Fireworks"],
+                "allow_fallbacks": false
+            },
+            "reasoning": {
+                "effort": "high",
+                "exclude": true
+            }
+        },
+        "gemini-2.0-flash-lite-preview": {
+            "provider": "openrouter",
+            "model_name": "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "max_tokens": 1000000,
+            "description": "Gemini 2.0 Flash Lite Preview model",
+            "openrouter_provider": {
+                "order": ["Google"],
+                "allow_fallbacks": false,
+                "data_collection": "disallow"
+            }
+        }
+    },
+    "provider_configs": {
+        "openai": {
+            "base_url": "https://api.openai.com/v1",
+            "requires": ["api_key"]
+        },
+        "azure": {
+            "requires": ["azure_key", "azure_endpoint"]
+        },
+        "siliconflow": {
+            "base_url": "https://api.siliconflow.cn/v1",
+            "requires": ["siliconflow_key"]
+        },
+        "azure-deepseek": {
+            "requires": ["ds_azure_key", "ds_azure_endpoint"]
+        },
+        "openrouter": {
+            "requires": ["openrouter_api_key"]
+        }
+    }
+} 

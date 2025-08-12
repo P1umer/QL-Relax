@@ -1,0 +1,5 @@
+juliet-test-suite-c/
+qlresult-origin/
+*.log
+**/*.log
+**/log/

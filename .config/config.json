@@ -1,0 +1,14 @@
+{
+    "selected_model": "azure-gpt4o",
+    "api_key": "dummy_key_for_openai",
+    "azure_key": "dummy_key_for_xxxx",
+    "azure_endpoint": "https://gpt4-func-sweden.openai.azure.com/openai/deployments/caozong-exp/chat/completions?api-version=2024-02-15-preview",
+    "siliconflow_key": "dummy_key_for_siliconflow",
+    "ds_azure_key": "dummy_key_for_xxx",
+    "ds_azure_endpoint": "https://ai-test324936320153.services.ai.azure.com/models/chat/completions?api-version=2024-05-01-preview",
+    "openrouter_api_key": "dummy_key_for_openrouter",
+    "max_tokens": 8192,
+    "temperature": 0.1,
+    "top_p": 1.0,
+    "stop_sequences": ["\n"]
+}
